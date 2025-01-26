@@ -1,0 +1,1 @@
+"C:\Acumatica ERP\Summit2025\Site\App_Data\Projects\Team14\Team14.sln"
