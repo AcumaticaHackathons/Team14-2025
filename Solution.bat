@@ -1,1 +1,1 @@
-"C:\Acumatica ERP\Summit2025\Site\App_Data\Projects\Team14\Team14.sln"
+"E:\Acumatica ERP\Hackathon2025\Site\App_Data\Projects\AcuPhotoBooth\AcuPhotoBooth.sln"
