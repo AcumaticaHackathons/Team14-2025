@@ -1,5 +1,6 @@
 ﻿using PX.Data;
 using PX.Objects.AR.CCPaymentProcessing.Common;
+using PX.Objects.IN;
 using PX.Objects.SO;
 using PX.SM;
 using System;
@@ -17,6 +18,15 @@ namespace AcuPhotoBooth
     {
 
         public PXSelect<ThreeDProgress, Where<ThreeDProgress.orderType, Equal<Current<SOOrder.orderType>>, And<ThreeDProgress.orderNbr, Equal<Current<SOOrder.orderNbr>>>>> OrderProgress;
+
+        public PXSetup<ThreeDPrefs> ThreeDSetup;
+
+        public override void Initialize()
+        {
+            base.Initialize();
+            ThreeDPrefs pref3D = ThreeDSetup.Current;
+        }
+
         public PXAction<SOOrder> ProcessImage;
         [PXButton]
         [PXUIField(DisplayName = "Process Image")]

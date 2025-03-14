@@ -29,11 +29,15 @@ namespace AcuPhotoBooth
         }
         public static FileProcessResult ProcessFile(string executablePath, string configFile, int maxSize, Stream fromFile,string fileID,string OrderType,string OrderNbr,Guid OrigFileID)
         {
+            ThreeDPrefs prefs = GetPrefs();
+            
             var graph = PXGraph.CreateInstance<SOOrderEntry>();
             var retVal = new FileProcessResult();
-            var bucket = "imagefiles-us-east-2";
-            var region = "us-east-2";
-            ThreeDProgress test =PXSelect<ThreeDProgress,Where<ThreeDProgress.orderType,Equal<Required<ThreeDProgress.orderType>>,And<ThreeDProgress.orderNbr,Equal<Required<ThreeDProgress.orderNbr>>,And<ThreeDProgress.fileid,Equal<Required<ThreeDProgress.fileid>>>>>>.Select(graph,OrderType,OrderNbr,OrigFileID);
+            //var bucket = "imagefiles-us-east-2";
+            //var region = "us-east-2";
+            var bucket = prefs.AWSBucket;
+            var region = prefs.AWSRegion;
+            ThreeDProgress test = PXSelect<ThreeDProgress,Where<ThreeDProgress.orderType,Equal<Required<ThreeDProgress.orderType>>,And<ThreeDProgress.orderNbr,Equal<Required<ThreeDProgress.orderNbr>>,And<ThreeDProgress.fileid,Equal<Required<ThreeDProgress.fileid>>>>>>.Select(graph,OrderType,OrderNbr,OrigFileID);
             if(test==null)
             {
                 PXDatabase.Insert<ThreeDProgress>(new PXDataFieldAssign<ThreeDProgress.progress1>(0)
@@ -62,9 +66,9 @@ namespace AcuPhotoBooth
             };
 
 
-            var aws = AWSClientFactory.CreateAmazonS3Client("AKIAVYV52DDRVVV4GXMH", "0o1KZ3Pc9uKrG28qjeztGX2tOhlaFWe5UykaipuV", awsConfig);
+            var aws = AWSClientFactory.CreateAmazonS3Client(prefs.Awskey, prefs.AWSSecret, awsConfig);
 
-            var result = UploadFile(aws, "imagefiles-us-east-2", fileID, fromFile);
+            var result = UploadFile(aws, prefs.AWSBucket, fileID, fromFile);
             if(result)
             {
                 var filename = $"https://{bucket}.s3.{region}.amazonaws.com/{fileID}";
@@ -99,9 +103,9 @@ namespace AcuPhotoBooth
                 {
                     RemeshModel RemeshResult = RetrieveRemeshTask(remeshID);
                     PXDatabase.Update<ThreeDProgress>(new PXDataFieldAssign<ThreeDProgress.progress2>(RemeshResult.progress)
-    , new PXDataFieldRestrict<ThreeDProgress.orderType>(OrderType)
-    , new PXDataFieldRestrict<ThreeDProgress.orderNbr>(OrderNbr)
-    , new PXDataFieldRestrict<ThreeDProgress.fileid>(OrigFileID));
+                        , new PXDataFieldRestrict<ThreeDProgress.orderType>(OrderType)
+                        , new PXDataFieldRestrict<ThreeDProgress.orderNbr>(OrderNbr)
+                        , new PXDataFieldRestrict<ThreeDProgress.fileid>(OrigFileID));
                     //textBox4.Text = RemeshResult.progress.ToString();
                     //textBox5.Text = DateTime.Now.Subtract(start).TotalSeconds.ToString();
                     //Application.DoEvents();
@@ -134,12 +138,19 @@ namespace AcuPhotoBooth
             process.WaitForExit();
             return File.Exists(toFile);
         }
+        public static ThreeDPrefs GetPrefs()
+        {
+            var graph = PXGraph.CreateInstance<ThreeDPrefMaint>();
+            ThreeDPrefs prefs = PXSelect<ThreeDPrefs>.Select(graph);
+            return prefs;
+        }
         public static string SendFile(string name, byte[] data)
         {
             WebResponse response = null;
             try
             {
-                string sWebAddress = $"http://192.168.228.203/upload/{name}";
+                ThreeDPrefs prefs = GetPrefs();
+                string sWebAddress = $"http://" + prefs.PrinterIP + $"/upload/{name}";
 
                 string boundary = "---------------------------" + DateTime.Now.Ticks.ToString("x");
                 byte[] boundarybytes = System.Text.Encoding.ASCII.GetBytes("\r\n--" + boundary + "\r\n");
@@ -151,7 +162,7 @@ namespace AcuPhotoBooth
                 wr.KeepAlive = true;
                 wr.Credentials = System.Net.CredentialCache.DefaultCredentials;
                 Stream stream = wr.GetRequestStream(); //new MemoryStream();
-                string formdataTemplate = "Content-Disposition: form-data; name=\"{0}\"\r\n\r\n{1}";
+                //string formdataTemplate = "Content-Disposition: form-data; name=\"{0}\"\r\n\r\n{1}";
 
                 stream.Write(boundarybytes, 0, boundarybytes.Length);
                 string headerTemplate = "Content-Disposition: form-data; name=\"{0}\"; filename=\"{1}\"\r\nContent-Type: {2}\r\n\r\n";
@@ -216,9 +227,10 @@ namespace AcuPhotoBooth
 
         public static string SendImageProcessing(string sendImageModelasString)
         {
+            ThreeDPrefs prefs = GetPrefs();
+
             var client = new WebClient();
-            //client.Headers.Add("Authorization", "msy_OrODMURN4rFn64eVyqM6pQwTsGwq2GOWbntw");
-            client.Headers.Add("Authorization", "msy_krH3TRsitb0qchcoeiPLJBSEV2rVr6rpAFnU");
+            client.Headers.Add("Authorization", prefs.MeshyKey);
             
             try
             {
@@ -228,7 +240,7 @@ namespace AcuPhotoBooth
 
                 return returnsModel.result;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return "";
             }
@@ -238,8 +250,9 @@ namespace AcuPhotoBooth
         public static ThreeDTaskModel Retrieve3DTask(string sendImageID)
         {
 
+            ThreeDPrefs prefs = GetPrefs(); 
             var client = new WebClient();
-            client.Headers.Add("Authorization", "msy_krH3TRsitb0qchcoeiPLJBSEV2rVr6rpAFnU");
+            client.Headers.Add("Authorization", prefs.MeshyKey);
             var response = client.DownloadData("https://api.meshy.ai/openapi/v1/image-to-3d/" + sendImageID);
 
             string respResult = System.Text.Encoding.ASCII.GetString(response);
@@ -250,8 +263,9 @@ namespace AcuPhotoBooth
 
         public static string RemeshProcessing(string remeshModel)
         {
+            ThreeDPrefs prefs = GetPrefs();
             var client = new WebClient();
-            client.Headers.Add("Authorization", "msy_krH3TRsitb0qchcoeiPLJBSEV2rVr6rpAFnU");
+            client.Headers.Add("Authorization", prefs.MeshyKey);
             try
             {
                 var response = client.UploadData("https://api.meshy.ai/openapi/v1/remesh", System.Text.Encoding.ASCII.GetBytes(remeshModel));
@@ -261,7 +275,7 @@ namespace AcuPhotoBooth
                 string returns = returnModel.result;
                 return returns;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 return "";
             }
@@ -270,8 +284,9 @@ namespace AcuPhotoBooth
 
         public static RemeshModel RetrieveRemeshTask(string remeshID)
         {
+            ThreeDPrefs prefs = GetPrefs();
             var client = new WebClient();
-            client.Headers.Add("Authorization", "msy_krH3TRsitb0qchcoeiPLJBSEV2rVr6rpAFnU");
+            client.Headers.Add("Authorization", prefs.MeshyKey);
             var response = client.DownloadData("https://api.meshy.ai/openapi/v1/remesh/" + remeshID);
 
             string respResult = System.Text.Encoding.ASCII.GetString(response);
